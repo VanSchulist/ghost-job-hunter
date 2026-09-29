@@ -1,0 +1,20 @@
+Title: Staff Backend Distributed Systems Engineer (Payments Core)
+Company: ScaleScale Inc.
+Location: San Francisco, CA (Hybrid)
+Salary Range: $195,000 - $235,000 per year + Equity
+
+Role Overview:
+Our Core Ledger team is hiring a Staff Engineer to own and scale our settlement pipeline processing 
+$12B+ in annual volume. You will report directly to the Director of Infrastructure Engineering and mentor 
+4 mid-level engineers.
+
+Key Responsibilities:
+- Architect and deploy idempotent transaction processors in Go to reduce p99 settlement latency below 120ms.
+- Refactor our Kafka event stream partition architecture to support 3x transaction throughput.
+- Lead the migration of legacy PostgreSQL transaction tables to CockroachDB without service disruption.
+- Participate in an on-call rotation with a committed SLA of 99.99% ledger availability.
+
+Requirements:
+- 7+ years production experience with distributed transactional systems in Go, Java, or Rust.
+- Deep expertise in database isolation levels, raft consensus protocols, and Kafka streaming.
+- Proven track record shipping mission-critical infrastructure under high reliability requirements.
