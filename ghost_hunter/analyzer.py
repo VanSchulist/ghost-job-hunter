@@ -23,8 +23,8 @@ class JobAnalyzer:
         """
         Extracts annual salary or hourly rate numbers to evaluate pay spread absurdity.
         """
-        # Matches patterns like $120,000 - $280,000 or $120k - $280k
-        range_pattern = r"\$\s*(\d{2,3}(?:,\d{3})*|\d{2,3}k)\s*(?:-|to|–|—)\s*\$\s*(\d{2,3}(?:,\d{3})*|\d{2,3}k)"
+        # Matches patterns like $120,000 - $280,000 or $120k - $280k or $120k-$280k
+        range_pattern = r"\$\s*(\d{2,3}(?:,\d{3})*k?)\s*(?:-|to|–|—)\s*\$?\s*(\d{2,3}(?:,\d{3})*k?)"
         match = re.search(range_pattern, text, re.IGNORECASE)
         
         if not match:

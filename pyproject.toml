@@ -1,0 +1,45 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ghost-job-hunter"
+version = "2.0.0"
+description = "Autonomous Anti-Ghost Job Hunting & Direct Outreach Agent powered by mcp-mesh"
+readme = "README.md"
+requires-python = ">=3.8"
+license = {text = "MIT"}
+authors = [
+    {name = "Van Schulist", email = "van@existentialcloud.ccwu.cc"}
+]
+keywords = [
+    "job-hunt",
+    "ghost-jobs",
+    "mcp",
+    "model-context-protocol",
+    "mcp-mesh",
+    "autonomous-agent",
+    "ai-agent",
+    "outreach",
+    "heuristics"
+]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "Topic :: Office/Business"
+]
+dependencies = []
+
+[project.urls]
+Homepage = "https://github.com/VanSchulist/ghost-job-hunter"
+Repository = "https://github.com/VanSchulist/ghost-job-hunter"
+Issues = "https://github.com/VanSchulist/ghost-job-hunter/issues"
+
+[project.scripts]
+ghost-hunter = "ghost_hunter.cli:main"
+ghost-job-hunter = "ghost_hunter.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["ghost_hunter*"]

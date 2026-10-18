@@ -3,7 +3,7 @@ Core Heuristic Definitions and Risk Scoring Engine for Ghost Job Hunter.
 """
 
 from dataclasses import dataclass, field
-from typing import List, Dict, Optional, Tuple
+from typing import List, Dict, Optional, Tuple, Any
 import re
 
 @dataclass
@@ -82,3 +82,77 @@ TECH_DOMAINS = {
     "Sales / GTM": ["salesforce", "hubspot", "cold calling", "prospecting", "lead generation", "quota", "bdr", "outreach"],
     "Compliance / Finance": ["sox", "hipaa", "gdpr", "pci-dss", "audit", "balance sheet", "gaap", "ifrs"]
 }
+
+
+# ----------------------------------------------------------------------
+# Agentic & Multi-Tool Data Models (Ghost Hunter v2.0)
+# ----------------------------------------------------------------------
+
+@dataclass
+class JobPosting:
+    title: str
+    company: str
+    description: str
+    location: str = "Remote / Unspecified"
+    salary_raw: str = ""
+    url: str = ""
+    posted_date: str = ""
+    requirements: List[str] = field(default_factory=list)
+    detected_tech_stack: List[str] = field(default_factory=list)
+
+
+@dataclass
+class CompanyAudit:
+    company_name: str
+    github_org: str = ""
+    public_repos_count: int = 0
+    top_languages: Dict[str, int] = field(default_factory=dict)
+    active_repos: List[str] = field(default_factory=list)
+    last_commit_date: str = ""
+    verified_tech_stack: List[str] = field(default_factory=list)
+    discrepancy_flags: List[str] = field(default_factory=list)
+    engineering_health_score: float = 100.0  # 0 to 100
+
+
+@dataclass
+class ProjectShowcase:
+    name: str
+    description: str
+    github_url: str = ""
+    tech_stack: List[str] = field(default_factory=list)
+    highlights: List[str] = field(default_factory=list)
+
+
+@dataclass
+class CandidateProfile:
+    name: str
+    title: str
+    bio: str
+    github_username: str = ""
+    skills: List[str] = field(default_factory=list)
+    featured_projects: List[ProjectShowcase] = field(default_factory=list)
+    contact_email: str = ""
+    linkedin_url: str = ""
+
+
+@dataclass
+class SkillMatchResult:
+    match_score: float  # 0.0 to 100.0%
+    matched_skills: List[str]
+    missing_skills: List[str]
+    superfluous_job_demands: List[str]
+    aligned_projects: List[ProjectShowcase]
+    key_selling_points: List[str]
+
+
+@dataclass
+class HuntResult:
+    job: JobPosting
+    diagnostic_report: DiagnosticReport
+    company_audit: Optional[CompanyAudit]
+    match_result: Optional[SkillMatchResult]
+    recommended_strategy: str  # "EXECUTIVE_BYPASS" | "TARGETED_ATS" | "AVOID_GHOST"
+    generated_pitch: str
+    tailored_bullets: List[str] = field(default_factory=list)
+    token_economy: Dict[str, Any] = field(default_factory=dict)
+
