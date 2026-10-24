@@ -69,6 +69,22 @@ class JobHunterAgent:
                 description=COMPLIANCE_SAMPLE
             )
 
+        # 2. Check if target is a live query, e.g. "hn:neuralframe" or "hn:python" or "live:hn"
+        if lower_t.startswith("hn:") or lower_t.startswith("live:") or lower_t in ["hn", "live"]:
+            from .sources import HNHiringSource
+            query = ""
+            if ":" in target:
+                query = target.split(":", 1)[1].strip()
+            source = HNHiringSource()
+            jobs = source.fetch_live_jobs(query=query if query else None, limit=1)
+            if jobs:
+                j = jobs[0]
+                if title:
+                    j.title = title
+                if company:
+                    j.company = company
+                return j
+
         # 2. Check if target is a URL
         if target.startswith("http://") or target.startswith("https://"):
             try:

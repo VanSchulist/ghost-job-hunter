@@ -218,6 +218,12 @@ def main():
     p_samples = subparsers.add_parser("samples", help="Run diagnostic on built-in test case samples")
     p_samples.add_argument("sample_type", choices=["ghost", "legit", "compliance"], help="Sample type to evaluate")
 
+    # Command: live (Hacker News Real-World Feed)
+    p_live = subparsers.add_parser("live", help="Browse real, live developer job postings directly from Hacker News")
+    p_live.add_argument("--query", default=None, help="Search filter (e.g. 'python', 'rust', 'ai')")
+    p_live.add_argument("--remote", action="store_true", help="Filter only remote-friendly postings")
+    p_live.add_argument("--limit", type=int, default=5, help="Number of postings to display (default: 5)")
+
     # Command: bypass (Direct Cold Outreach Generator)
     p_bypass = subparsers.add_parser("bypass", help="Generate a 1-page direct executive pitch letter")
     p_bypass.add_argument("--title", required=True, help="Target Job Title")
@@ -384,6 +390,31 @@ def main():
         print(f"{DIM}Running Heuristic Engine against verified benchmark: [{args.sample_type.upper()}]{RESET}")
         report = analyzer.analyze(text, title=title, company=comp)
         print_report(report)
+
+    elif args.command == "live":
+        from .sources import HNHiringSource
+        print(BANNER)
+        print(f"{CYAN}[*] Fetching live engineering jobs from Hacker News 'Who is hiring?'...{RESET}\n")
+        source = HNHiringSource()
+        try:
+            jobs = source.fetch_live_jobs(query=args.query, remote_only=args.remote, limit=args.limit)
+            if not jobs:
+                print(f"{YELLOW}[!] No matching live job postings found.{RESET}")
+            else:
+                for i, j in enumerate(jobs, 1):
+                    print(f"{BOLD}[{i}] {j.company}{RESET} - {WHITE}{j.title}{RESET}")
+                    if j.salary_raw:
+                        print(f"    Compensation: {GREEN}{j.salary_raw}{RESET}")
+                    if j.location:
+                        print(f"    Location    : {DIM}{j.location}{RESET}")
+                    if j.url:
+                        print(f"    Link        : {CYAN}{j.url}{RESET}")
+                    first_p = j.description.split("\n")[1] if len(j.description.split("\n")) > 1 else j.description[:180]
+                    print(f"    Details     : {first_p[:200]}...")
+                    print()
+                print(f"{DIM}Tip: Run 'python main.py hunt \"hn:{jobs[0].company}\"' to run an autonomous reality check & tailored pitch!{RESET}\n")
+        except Exception as e:
+            print(f"{RED}[!] Error fetching live postings: {str(e)}{RESET}")
 
     elif args.command == "bypass":
         mock_report = DiagnosticReport(

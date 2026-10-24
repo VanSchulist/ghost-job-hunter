@@ -10,6 +10,9 @@ from __future__ import annotations
 import sys
 import os
 import json
+import time
+import sqlite3
+import datetime
 import subprocess
 from typing import Dict, List, Any, Optional, Tuple
 from pathlib import Path
@@ -148,11 +151,45 @@ class MeshClient:
             }
         return None
 
+    def _record_telemetry(
+        self,
+        server_id: str,
+        tool_name: str,
+        latency_ms: float,
+        success: bool,
+        tokens_baseline: int,
+        tokens_mesh: int,
+        tokens_saved: int,
+        error_message: Optional[str] = None
+    ) -> None:
+        """Persists live tool execution metrics to mcp-mesh SQLite ledger."""
+        db_path = Path.home() / ".mcp-mesh" / "telemetry.db"
+        if not db_path.exists():
+            return
+
+        try:
+            conn = sqlite3.connect(str(db_path), timeout=3.0)
+            with conn:
+                ts = datetime.datetime.now().isoformat()
+                conn.execute(
+                    """
+                    INSERT INTO calls (
+                        timestamp, session_id, caller, server_id, tool_name,
+                        latency_ms, success, cache_hit, tokens_baseline, tokens_mesh, tokens_saved, error_message
+                    ) VALUES (?, 'ghost-hunter-live', 'agent', ?, ?, ?, ?, 1, ?, ?, ?, ?)
+                    """,
+                    (ts, server_id, tool_name, latency_ms, 1 if success else 0, tokens_baseline, tokens_mesh, tokens_saved, error_message)
+                )
+            conn.close()
+        except Exception:
+            pass
+
     def invoke_tool(self, tool_name: str, arguments: Dict[str, Any]) -> Any:
         """
         Invokes an MCP tool either in-process or via the gateway.
-        Tracks token savings for every turn.
+        Tracks token savings for every turn and logs to mcp-mesh telemetry.
         """
+        start_time = time.perf_counter()
         self.calls_count += 1
         meta = self.tools_registry.get(tool_name, {})
         raw_tokens = meta.get("raw_tokens", 400)
@@ -161,6 +198,34 @@ class MeshClient:
         saved = max(raw_tokens - used_tokens, 0)
         self.tokens_saved_total += saved
 
+        try:
+            result = self._dispatch_tool(tool_name, arguments)
+            latency_ms = (time.perf_counter() - start_time) * 1000.0
+            self._record_telemetry(
+                server_id="ghost-job-hunter",
+                tool_name=tool_name.replace("ghost_hunter::", ""),
+                latency_ms=round(latency_ms, 2),
+                success=True,
+                tokens_baseline=raw_tokens,
+                tokens_mesh=used_tokens,
+                tokens_saved=saved
+            )
+            return result
+        except Exception as e:
+            latency_ms = (time.perf_counter() - start_time) * 1000.0
+            self._record_telemetry(
+                server_id="ghost-job-hunter",
+                tool_name=tool_name.replace("ghost_hunter::", ""),
+                latency_ms=round(latency_ms, 2),
+                success=False,
+                tokens_baseline=raw_tokens,
+                tokens_mesh=used_tokens,
+                tokens_saved=0,
+                error_message=str(e)
+            )
+            raise
+
+    def _dispatch_tool(self, tool_name: str, arguments: Dict[str, Any]) -> Any:
         # Local in-process execution dispatch
         if tool_name == "ghost_hunter::audit_posting":
             from .analyzer import JobAnalyzer
