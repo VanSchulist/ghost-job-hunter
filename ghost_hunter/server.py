@@ -207,3 +207,7 @@ def run_mcp_server() -> None:
             }
             sys.stdout.write(json.dumps(err_resp) + "\n")
             sys.stdout.flush()
+
+
+if __name__ == "__main__":
+    run_mcp_server()
