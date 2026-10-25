@@ -49,8 +49,8 @@ BANNER = rf"""{CYAN}{BOLD}
  | |  _| |_| | | | \___ \ | |   _  | | | | |  _ \ 
  | |_| |  _  | |_| |___) || |  | |_| | |_| | |_) |
   \____|_| |_|\___/|____/ |_|   \___/ \___/|____/ 
-  {MAGENTA}>> GHOST JOB HUNTER v2.1 | Autonomous mcp-mesh Tactical Agent <<{RESET}
-  {DIM}Curated & Vibe-Coded by Van Schulist (@VanSchulist) | Existential Cloud{RESET}
+  {MAGENTA}>> GHOST JOB HUNTER v2.1 | Deterministic Heuristic Engine <<{RESET}
+  {DIM}Engineered by Van Schulist (@VanSchulist) | Existential Cloud{RESET}
 """
 
 def render_meter(score: float) -> str:
@@ -170,11 +170,62 @@ def register_with_mcp_mesh() -> None:
     print(f"{CYAN}[*]{RESET} mcp-mesh and Antigravity can now route tools to ghost-job-hunter via stdio.")
 
 
+
+def cmd_demo(args: argparse.Namespace) -> None:
+    """Instant zero-config heuristic audit demonstration."""
+    print(BANNER)
+    print(f"{CYAN}[*] Running Instant Anti-Ghost Job Heuristic Audit Demonstration...{RESET}")
+    print(f"{DIM}[*] Evaluating calibrated benchmark: 'Principal Cloud Solutions Architect (Evergreen Pipeline)' @ Apex Global Tech{RESET}\n")
+
+    from .sample_data import GHOST_SAMPLE
+    from .analyzer import JobAnalyzer
+    from .pipeline import JobPipelineStore
+    from .mesh_client import MeshClient
+
+    analyzer = JobAnalyzer()
+    report = analyzer.analyze(
+        GHOST_SAMPLE,
+        title="Principal Cloud Solutions Architect (Evergreen Pipeline)",
+        company="Apex Global Tech"
+    )
+
+    print_report(report)
+
+    # Pipeline record
+    pipe = JobPipelineStore()
+    lead_id = pipe.save_lead(
+        company="Apex Global Tech",
+        title="Principal Cloud Solutions Architect (Evergreen Pipeline)",
+        source="demo-audit",
+        salary="$95,000 - $265,000",
+        location="Remote, US",
+        gpi_score=report.ghost_probability_index,
+        risk_level=report.risk_level,
+        fit_score=78.5,
+        status="REJECTED",
+        notes="Calibrated demo audit. Phantom listing detected via deterministic heuristics."
+    )
+    print(f"{GREEN}[+] Tracked in local pipeline as Lead #{lead_id} [REJECTED]{RESET}")
+
+    # Token economy
+    mesh = MeshClient()
+    stats = mesh.get_token_economy_stats()
+    print(f"\n{BOLD}{CYAN}=== mcp-mesh DYNAMIC TOOL ROUTING ECONOMY ==={RESET}")
+    print(f"  Turn-0 Baseline Footprint : {stats['baseline_turn0_tokens']} tokens (un-routed static tool schemas)")
+    print(f"  mcp-mesh Lazy Routing     : {stats['mesh_turn0_tokens']} tokens")
+    print(f"  Context Token Reduction   : {GREEN}{BOLD}{stats['static_savings_ratio']}{RESET} ({stats['static_token_savings']} tokens saved)")
+    print(f"\n{GREEN}[+] Demo completed successfully. Zero external dependencies required.{RESET}\n")
+
 def main():
     parser = argparse.ArgumentParser(
-        description="Ghost Job Hunter v2.1 - Autonomous anti-ghost job hunting agent powered by mcp-mesh."
+        description="Ghost Job Hunter v2.1 - Deterministic heuristic job audit engine powered by mcp-mesh."
     )
+    parser.add_argument("--demo", "-d", action="store_true", help="Run instant zero-config heuristic audit demonstration")
+    parser.add_argument("--version", "-v", action="version", version="ghost-job-hunter 2.1.0")
     subparsers = parser.add_subparsers(dest="command", help="Available subcommands")
+
+    # Command: demo
+    subparsers.add_parser("demo", help="Run instant zero-config heuristic audit demonstration")
 
     # Command: hunt (Autonomous Agent Pipeline)
     p_hunt = subparsers.add_parser("hunt", help="Autonomous end-to-end job hunting workflow via mcp-mesh")
@@ -259,10 +310,13 @@ def main():
 
     args = parser.parse_args()
 
+    if getattr(args, "demo", False) or args.command == "demo":
+        cmd_demo(args)
+        return
+
     if not args.command:
-        print(BANNER)
-        parser.print_help()
-        sys.exit(0)
+        cmd_demo(args)
+        return
 
     # Dispatch subcommands
     if args.command == "hunt":
