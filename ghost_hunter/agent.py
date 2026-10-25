@@ -101,17 +101,21 @@ class JobHunterAgent:
                 # If network fails, treat target as raw text
                 pass
 
-        # 3. Check if target is a local file path
-        p = Path(target)
-        if p.exists() and p.is_file():
-            content = p.read_text(encoding="utf-8", errors="ignore")
-            derived_title = title or p.stem.replace("_", " ").title()
-            derived_company = company or "Target Company"
-            return JobPosting(
-                title=derived_title,
-                company=derived_company,
-                description=content
-            )
+        # 3. Check if target is a local file path (safely check length and newlines to avoid POSIX Errno 36)
+        if "\n" not in target and len(target.strip()) < 260:
+            try:
+                p = Path(target)
+                if p.exists() and p.is_file():
+                    content = p.read_text(encoding="utf-8", errors="ignore")
+                    derived_title = title or p.stem.replace("_", " ").title()
+                    derived_company = company or "Target Company"
+                    return JobPosting(
+                        title=derived_title,
+                        company=derived_company,
+                        description=content
+                    )
+            except OSError:
+                pass
 
         # 4. Check if target is a company name or short query (e.g. "NeuralFrame", "DuckDuckGo", "Onebrief")
         if len(target.strip()) < 120 and "\n" not in target:

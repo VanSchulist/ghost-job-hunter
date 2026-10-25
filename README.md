@@ -85,6 +85,9 @@
 | **The Unicorn Paradox (Scope Creep)** | **15%** | Flags requisitions demanding deep mastery across 4 or more incompatible disciplines (e.g. React frontend + Rust systems + Kubernetes SRE + Sales prospecting). |
 | **Fluff & Buzzword Overload Density** | **15%** | Measures the statistical ratio of empty corporate adjectives (*"rockstar"*, *"ninja"*, *"synergy"*, *"wear many hats"*) against verifiable functional KPIs. |
 
+> **Methodological Note on Risk Scoring**:  
+> The Ghost Probability Index (GPI) is an empirical heuristic scoring model (0–100%) that aggregates the weighted indicators above. It is engineered as a candidate triage tool to highlight low-intent or compliance-driven job requisitions, rather than a formally calibrated statistical or Bayesian posterior probability. Users should treat triggered signals as investigative clues rather than definitive legal conclusions.
+
 ---
 
 ## 🚀 Quickstart & Installation

@@ -18,9 +18,15 @@ class HeuristicSignal:
 
 @dataclass
 class DiagnosticReport:
+    """Diagnostic assessment produced by heuristic signal analyzers.
+
+    NOTE: 'ghost_probability_index' is an empirical heuristic risk indicator (0.0 to 100.0)
+    evaluating linguistic and structural patterns typical of low-intent requisitions.
+    It represents a heuristic risk score rather than a formally calibrated Bayesian posterior probability.
+    """
     job_title: str
     company_name: str
-    ghost_probability_index: float  # 0.0 to 100.0%
+    ghost_probability_index: float  # 0.0 to 100.0% heuristic risk score
     risk_level: str  # ACTIVE | LOW_CONFIDENCE | SUSPECTED_HARVEST | CRITICAL_GHOST
     verdict_summary: str
     signals: List[HeuristicSignal]
