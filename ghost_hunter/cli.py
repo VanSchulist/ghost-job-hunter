@@ -99,7 +99,7 @@ def print_report(report: DiagnosticReport, json_output: bool = False):
     print("=" * 76)
     
     print(f"\n{BOLD}Ghost Probability Index (GPI):{RESET}")
-    print(f"  {render_meter(report.ghost_probability_index)}")
+    print(f"  {render_meter(report.ghost_probability_index)} {DIM}(Empirical Heuristic Risk Score){RESET}")
     
     if report.risk_level == "CRITICAL_GHOST":
         badge = f"{RED}{BOLD}[ CRITICAL GHOST JOB / PIPELINE THEATER ]{RESET}"
