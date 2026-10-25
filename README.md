@@ -1,7 +1,7 @@
-# 👻 Ghost Job Hunter v2.0
+# 👻 Ghost Job Hunter v2.1
 
 > **The Autonomous Anti-Ghost Job Hunting & Direct Outreach Agent powered by `mcp-mesh`**  
-> Uncover phantom job postings, verify real company GitHub codebases, eliminate ATS black holes, and generate high-converting executive bypass pitches with zero external dependencies.
+> Uncover phantom job postings, scrape live developer hiring feeds (Hacker News, RemoteOK, WeWorkRemotely), verify real company GitHub codebases, track genuine opportunities in a local SQLite pipeline, and generate 1-click ready-to-send RFC 822 email application packages with zero external dependencies.
 
 [![Curated by Van Schulist](https://img.shields.io/badge/Curated%20by-Van%20Schulist-8A2BE2?style=flat-square&logo=openai)](https://github.com/VanSchulist)
 [![Zero Dependencies](https://img.shields.io/badge/Dependencies-Standard%20Library%20Only-success?style=flat-square)](https://github.com/VanSchulist/ghost-job-hunter)
@@ -16,25 +16,28 @@
  | |  _| |_| | | | \___ \ | |   _  | | | | |  _ \ 
  | |_| |  _  | |_| |___) || |  | |_| | |_| | |_) |
   \____|_| |_|\___/|____/ |_|   \___/ \___/|____/ 
-  >> GHOST JOB HUNTER v2.0 | Autonomous mcp-mesh Agent <<
+  >> GHOST JOB HUNTER v2.1 | Autonomous mcp-mesh Tactical Agent <<
   Curated & Vibe-Coded by Van Schulist (@VanSchulist) | Existential Cloud
 ```
 
-> *"Over 40% of tech job listings are 'Ghost Jobs'—postings kept open indefinitely to pacify overworked teams, build passive resume banks, or project phantom growth to investors. Applying to them via automated ATS portals is an algorithmic trap. Ghost Job Hunter v2.0 turns the tables by deploying an autonomous multi-role agent that audits the hiring reality, inspects the company's real GitHub footprint, and bypasses broken portals directly to engineering leadership."*
+> *"Over 40% of tech job listings are 'Ghost Jobs'—postings kept open indefinitely to pacify overworked teams, build passive resume banks, or project phantom growth to investors. Ghost Job Hunter connects directly to live developer hiring feeds, audits hiring legitimacy against public GitHub repositories, and produces ready-to-send RFC 822 email packages that launch straight into your mail client."*
 
 ---
 
-## 💡 What's New in v2.0
+## 💡 What's New in v2.1
 
+* 🌍 **Live Real-World Hiring Feeds (`live`)**: Scrapes real engineering positions live across:
+  * **Hacker News**: Direct founder posts from the monthly *"Ask HN: Who is hiring?"* thread.
+  * **RemoteOK**: 100+ active remote engineering positions with verified compensation bands.
+  * **WeWorkRemotely**: Established engineering firms and tech heavyweights (e.g. DuckDuckGo).
+* 🗄️ **Local SQLite Pipeline Ledger (`pipeline`)**: Automatically saves discovered and audited opportunities to `~/.ghost-hunter/pipeline.db`. Track funnel stages: `DISCOVERED` ➔ `AUDITED` ➔ `PITCH_READY` ➔ `APPLIED` ➔ `INTERVIEWING` ➔ `OFFER`.
+* ✉️ **1-Click Application Outreach Exporter (`--export`)**:
+  * **RFC 822 `.eml` standard file**: Double-clicking opens Outlook, Apple Mail, or Thunderbird with pre-filled recipient, subject, and tailored proof-of-work body.
+  * **Tactical Markdown Dossier**: Deep dive including company GitHub health and candidate alignment.
+  * **Clickable `mailto:` link**: 1-click terminal dispatcher.
 * 🌐 **Dynamic Tool Routing via `mcp-mesh`**: Eliminates Turn-0 schema bloat. Tools (`audit_posting`, `audit_company_github`, `match_candidate`, `generate_pitch`) are discovered and loaded lazily on demand, slashing context token usage by **77.6% to 90%**.
-* 🤖 **Autonomous Multi-Role Agent Pipeline (`hunt`)**: Single command executes end-to-end job scouting, ghost heuristic auditing, GitHub codebase verification, candidate matching, and outreach synthesis.
-* 🔍 **Company GitHub Stack & Reality Audit (`inspect`)**: Cross-references job descriptions against public GitHub repositories. Detects dormant codebases and discrepancies (e.g. asking for "10 years of Rust & K8s" when the company repo is 100% PHP with zero commits).
-* 🎯 **Proof-of-Work Candidate Alignment (`tailor`)**: Matches candidate GitHub repositories and credentials (defaulting to Van Schulist / Existential Cloud portfolio), producing targeted ATS action bullets.
-* 📨 **Bifurcated Strategic Outreach Engine**:
-  * **If Ghost Job / Trap (GPI >= 40%)**: Generates an **Executive Bypass Value Pitch** targeting the VP of Engineering to skip the broken portal.
-  * **If Active Requisition (GPI < 40%)**: Generates a **Targeted High-Conversion Application** with tailored resume bullets highlighting proven open-source implementations.
-* 🔌 **Bidirectional MCP Support (`serve-mcp`)**: Runs as a standard Model Context Protocol (MCP) stdio server. Auto-registers with Antigravity, Claude Desktop, Cursor, and `mcp-mesh`.
-* ⚡ **100% Zero External Dependencies**: Engineered with pure Python standard library (`urllib.request`, `json`, `dataclasses`, `re`, `argparse`). Instant execution with zero `pip install` friction.
+* 🔍 **Company GitHub Stack & Reality Audit (`inspect`)**: Cross-references job descriptions against public GitHub repositories. Detects dormant codebases and discrepancies.
+* ⚡ **100% Zero External Dependencies**: Pure Python standard library (`urllib.request`, `json`, `sqlite3`, `email`, `re`, `argparse`). Instant execution with zero `pip install` friction.
 
 ---
 
@@ -186,7 +189,11 @@ GitHub: https://github.com/VanSchulist | Email: van@existentialcloud.ccwu.cc
 
 | Command | Arguments | Description |
 | :--- | :--- | :--- |
-| `python main.py hunt <target>` | `--title`, `--company`, `--output`, `--json` | **Flagship command**: End-to-end autonomous agent workflow. |
+| `python main.py hunt <target>` | `--title`, `--company`, `--export`, `--output`, `--json` | **Flagship command**: End-to-end autonomous agent hunt. Audits, matches, records to pipeline, and exports ready-to-send `.eml`! |
+| `python main.py live` | `--source <all\|hn\|remoteok\|wwr>`, `--query`, `--remote`, `--limit`, `--save` | Scrapes real developer hiring feeds live and optionally saves leads to local pipeline. |
+| `python main.py pipeline list` | `--status <stage>`, `--query <q>`, `--max-gpi <n>` | Queries local SQLite pipeline ledger (`~/.ghost-hunter/pipeline.db`). |
+| `python main.py pipeline status <id> <status>` | `--notes <text>` | Updates lead funnel stage (`DISCOVERED`, `AUDITED`, `PITCH_READY`, `APPLIED`, etc.). |
+| `python main.py pipeline stats` | None | Displays pipeline funnel conversion metrics and stage breakdown. |
 | `python main.py analyze <target>` | `--title`, `--company`, `--bypass`, `--json` | Heuristic evaluation with Ghost Probability Index (GPI) calculation. |
 | `python main.py inspect <company>` | `--claimed <tech...>` | Audits public GitHub repositories, active languages, and commit recency. |
 | `python main.py tailor <target>` | `--profile <path>`, `--company <name>` | Matches candidate profile to requirements and produces tailored bullet points. |
@@ -223,7 +230,7 @@ Exposed MCP Tools:
 
 ## 🧪 Automated Test Suite
 
-Run the complete 21-test test suite across heuristics, GitHub auditing, candidate matching, agent loop, and MCP protocol:
+Run the complete 33-test test suite across heuristics, GitHub auditing, candidate matching, pipeline ledger, outreach exporter, and MCP protocol:
 
 ```bash
 python -m unittest discover -s tests

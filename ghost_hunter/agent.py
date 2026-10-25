@@ -69,21 +69,18 @@ class JobHunterAgent:
                 description=COMPLIANCE_SAMPLE
             )
 
-        # 2. Check if target is a live query, e.g. "hn:neuralframe" or "hn:python" or "live:hn"
-        if lower_t.startswith("hn:") or lower_t.startswith("live:") or lower_t in ["hn", "live"]:
-            from .sources import HNHiringSource
-            query = ""
-            if ":" in target:
-                query = target.split(":", 1)[1].strip()
-            source = HNHiringSource()
-            jobs = source.fetch_live_jobs(query=query if query else None, limit=1)
-            if jobs:
-                j = jobs[0]
+        # 2. Check if target is a live query, e.g. "hn:neuralframe", "remoteok:onebrief", "wwr:duckduckgo"
+        prefixes = ("hn:", "remoteok:", "wwr:", "live:", "online:")
+        if lower_t.startswith(prefixes) or lower_t in ["hn", "remoteok", "wwr", "live"]:
+            from .sources import UnifiedJobSource
+            source = UnifiedJobSource()
+            job = source.resolve_target(target)
+            if job:
                 if title:
-                    j.title = title
+                    job.title = title
                 if company:
-                    j.company = company
-                return j
+                    job.company = company
+                return job
 
         # 2. Check if target is a URL
         if target.startswith("http://") or target.startswith("https://"):
@@ -116,7 +113,22 @@ class JobHunterAgent:
                 description=content
             )
 
-        # 4. Fallback: target is raw text description
+        # 4. Check if target is a company name or short query (e.g. "NeuralFrame", "DuckDuckGo", "Onebrief")
+        if len(target.strip()) < 120 and "\n" not in target:
+            try:
+                from .sources import UnifiedJobSource
+                source = UnifiedJobSource()
+                job = source.resolve_target(target)
+                if job:
+                    if title:
+                        job.title = title
+                    if company:
+                        job.company = company
+                    return job
+            except Exception:
+                pass
+
+        # 5. Fallback: target is raw text description
         return JobPosting(
             title=title or "Software Engineer",
             company=company or "Target Company",

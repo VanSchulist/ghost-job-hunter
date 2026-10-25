@@ -27,6 +27,9 @@ from .github_auditor import CompanyGitHubAuditor
 from .matcher import CandidateMatcher
 from .mesh_client import MeshClient
 from .server import run_mcp_server
+from .sources import UnifiedJobSource, HNHiringSource, RemoteOKSource, WeWorkRemotelySource
+from .pipeline import JobPipelineStore
+from .outreach import OutreachExporter
 
 # ANSI color codes
 RESET = "\033[0m"
@@ -46,7 +49,7 @@ BANNER = rf"""{CYAN}{BOLD}
  | |  _| |_| | | | \___ \ | |   _  | | | | |  _ \ 
  | |_| |  _  | |_| |___) || |  | |_| | |_| | |_) |
   \____|_| |_|\___/|____/ |_|   \___/ \___/|____/ 
-  {MAGENTA}>> GHOST JOB HUNTER v2.0 | Autonomous mcp-mesh Agent <<{RESET}
+  {MAGENTA}>> GHOST JOB HUNTER v2.1 | Autonomous mcp-mesh Tactical Agent <<{RESET}
   {DIM}Curated & Vibe-Coded by Van Schulist (@VanSchulist) | Existential Cloud{RESET}
 """
 
@@ -155,7 +158,7 @@ def register_with_mcp_mesh() -> None:
         "command": sys.executable,
         "args": ["-m", "ghost_hunter.server"],
         "env": {},
-        "description": "Ghost Job Hunter v2.0 - Autonomous anti-ghost job hunting & ATS bypass agent"
+        "description": "Ghost Job Hunter v2.1 - Autonomous anti-ghost job hunting & ATS bypass agent"
     }
 
     data.setdefault("mcpServers", {})["ghost-job-hunter"] = server_entry
@@ -169,17 +172,19 @@ def register_with_mcp_mesh() -> None:
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Ghost Job Hunter v2.0 - Autonomous anti-ghost job hunting agent powered by mcp-mesh."
+        description="Ghost Job Hunter v2.1 - Autonomous anti-ghost job hunting agent powered by mcp-mesh."
     )
     subparsers = parser.add_subparsers(dest="command", help="Available subcommands")
 
     # Command: hunt (Autonomous Agent Pipeline)
     p_hunt = subparsers.add_parser("hunt", help="Autonomous end-to-end job hunting workflow via mcp-mesh")
-    p_hunt.add_argument("target", help="Job description text, file path, URL, or sample ('ghost', 'legit', 'compliance')")
+    p_hunt.add_argument("target", help="Job description text, file path, URL, sample ('ghost', 'legit', 'compliance'), or live query ('hn:co', 'remoteok:co', 'wwr:co')")
     p_hunt.add_argument("--title", default=None, help="Target Job Title")
     p_hunt.add_argument("--company", default=None, help="Target Company Name")
     p_hunt.add_argument("--profile", default=None, help="Path to custom candidate profile JSON")
     p_hunt.add_argument("--output", default=None, help="Write comprehensive tactical dossier to file")
+    p_hunt.add_argument("--export", action="store_true", help="Export ready-to-send RFC 822 .eml and markdown package to outreach/")
+    p_hunt.add_argument("--recipient", default=None, help="Recipient email address for cold application outreach")
     p_hunt.add_argument("--json", action="store_true", help="Output machine-readable JSON format")
 
     # Command: analyze (Classic Heuristic Analysis)
@@ -218,11 +223,33 @@ def main():
     p_samples = subparsers.add_parser("samples", help="Run diagnostic on built-in test case samples")
     p_samples.add_argument("sample_type", choices=["ghost", "legit", "compliance"], help="Sample type to evaluate")
 
-    # Command: live (Hacker News Real-World Feed)
-    p_live = subparsers.add_parser("live", help="Browse real, live developer job postings directly from Hacker News")
-    p_live.add_argument("--query", default=None, help="Search filter (e.g. 'python', 'rust', 'ai')")
+    # Command: live (Multi-Source Real-World Feeds)
+    p_live = subparsers.add_parser("live", help="Browse real, live developer job postings across HN, RemoteOK, and WeWorkRemotely")
+    p_live.add_argument("--source", choices=["all", "hn", "remoteok", "wwr"], default="all", help="Job source (default: all)")
+    p_live.add_argument("--query", default=None, help="Search filter (e.g. 'python', 'rust', 'backend')")
     p_live.add_argument("--remote", action="store_true", help="Filter only remote-friendly postings")
     p_live.add_argument("--limit", type=int, default=5, help="Number of postings to display (default: 5)")
+    p_live.add_argument("--save", action="store_true", help="Automatically save all fetched leads into ~/.ghost-hunter/pipeline.db")
+
+    # Command: pipeline (Local Opportunity Tracking Ledger)
+    p_pipe = subparsers.add_parser("pipeline", help="Manage and query local job hunting pipeline (~/.ghost-hunter/pipeline.db)")
+    p_pipe_sub = p_pipe.add_subparsers(dest="pipe_action", help="Pipeline action: list, status, stats, inspect")
+    
+    p_pl_list = p_pipe_sub.add_parser("list", help="List tracked opportunities")
+    p_pl_list.add_argument("--status", choices=JobPipelineStore.VALID_STATUSES, default=None, help="Filter by pipeline status")
+    p_pl_list.add_argument("--query", default=None, help="Filter by company or role keyword")
+    p_pl_list.add_argument("--max-gpi", type=float, default=None, help="Maximum Ghost Probability Index (GPI)")
+    p_pl_list.add_argument("--limit", type=int, default=20, help="Max entries to return")
+
+    p_pl_status = p_pipe_sub.add_parser("status", help="Update the status of a lead")
+    p_pl_status.add_argument("id", type=int, help="Lead ID in pipeline")
+    p_pl_status.add_argument("new_status", choices=JobPipelineStore.VALID_STATUSES, help="Target status")
+    p_pl_status.add_argument("--notes", default=None, help="Add or update notes")
+
+    p_pipe_sub.add_parser("stats", help="Show pipeline funnel metrics and statistics")
+
+    p_pl_insp = p_pipe_sub.add_parser("inspect", help="Inspect detailed lead record")
+    p_pl_insp.add_argument("id", type=int, help="Lead ID in pipeline")
 
     # Command: bypass (Direct Cold Outreach Generator)
     p_bypass = subparsers.add_parser("bypass", help="Generate a 1-page direct executive pitch letter")
@@ -248,8 +275,30 @@ def main():
 
         hunt_result = agent.hunt(args.target, title=args.title, company=args.company)
 
+        # Automatically record to pipeline
+        pipe = JobPipelineStore()
+        fit_score = hunt_result.match_result.match_score if hunt_result.match_result else 0.0
+        gpi = hunt_result.diagnostic_report.ghost_probability_index
+        risk = hunt_result.diagnostic_report.risk_level
+        init_status = "AUDITED" if gpi < 65.0 else "REJECTED"
+
+        lead_id = pipe.save_lead(
+            company=hunt_result.job.company,
+            title=hunt_result.job.title,
+            source="hunt",
+            url=hunt_result.job.url,
+            salary=hunt_result.job.salary_raw,
+            location=hunt_result.job.location,
+            gpi_score=gpi,
+            risk_level=risk,
+            fit_score=fit_score,
+            status=init_status,
+            notes=f"Audited via mcp-mesh. Strategy: {hunt_result.recommended_strategy}"
+        )
+
         if args.json:
             data = {
+                "lead_id": lead_id,
                 "job": {
                     "title": hunt_result.job.title,
                     "company": hunt_result.job.company,
@@ -277,6 +326,19 @@ def main():
         else:
             dossier = generate_comprehensive_report(hunt_result)
             print(dossier)
+            print(f"{GREEN}[+] Tracked in local pipeline as Lead #{lead_id} [{init_status}]{RESET}")
+
+        # Export outreach package if requested
+        if args.export:
+            exporter = OutreachExporter()
+            pkg = exporter.export(hunt_result, candidate=profile, recipient_email=args.recipient)
+            pipe.update_status(lead_id, "PITCH_READY", notes=f"Exported to {pkg['eml_path']}")
+            print(f"\n{BOLD}{CYAN}=== ACTIONABLE OUTREACH PACKAGE READY ==={RESET}")
+            print(f"  {GREEN}✔ RFC 822 Email File : {WHITE}{pkg['eml_path']}{RESET}")
+            print(f"  {GREEN}✔ Tactical Dossier   : {WHITE}{pkg['dossier_path']}{RESET}")
+            print(f"  {GREEN}✔ Target Recipient   : {WHITE}{pkg['recipient']}{RESET}")
+            print(f"  {GREEN}✔ Quick Mailto Link  : {CYAN}{pkg['mailto_uri']}{RESET}")
+            print(f"\n{DIM}Tip: On Windows, run 'start \"\" \"{pkg['eml_path']}\"' to open draft in Outlook / Mail!{RESET}\n")
 
         if args.output:
             out_p = Path(args.output)
@@ -392,12 +454,13 @@ def main():
         print_report(report)
 
     elif args.command == "live":
-        from .sources import HNHiringSource
         print(BANNER)
-        print(f"{CYAN}[*] Fetching live engineering jobs from Hacker News 'Who is hiring?'...{RESET}\n")
-        source = HNHiringSource()
+        print(f"{CYAN}[*] Fetching live engineering jobs from {args.source.upper()} feeds...{RESET}\n")
+        unified = UnifiedJobSource()
+        pipe = JobPipelineStore() if args.save else None
+
         try:
-            jobs = source.fetch_live_jobs(query=args.query, remote_only=args.remote, limit=args.limit)
+            jobs = unified.fetch_live_jobs(source=args.source, query=args.query, remote_only=args.remote, limit=args.limit)
             if not jobs:
                 print(f"{YELLOW}[!] No matching live job postings found.{RESET}")
             else:
@@ -409,12 +472,89 @@ def main():
                         print(f"    Location    : {DIM}{j.location}{RESET}")
                     if j.url:
                         print(f"    Link        : {CYAN}{j.url}{RESET}")
-                    first_p = j.description.split("\n")[1] if len(j.description.split("\n")) > 1 else j.description[:180]
+                    first_p = j.description.split("\n")[0] if "\n" in j.description else j.description[:180]
                     print(f"    Details     : {first_p[:200]}...")
+                    
+                    if pipe:
+                        lid = pipe.save_lead(
+                            company=j.company,
+                            title=j.title,
+                            source=args.source,
+                            url=j.url,
+                            salary=j.salary_raw,
+                            location=j.location,
+                            status="DISCOVERED",
+                            notes="Imported via live scan"
+                        )
+                        print(f"    Pipeline    : {MAGENTA}Saved as Lead #{lid} [DISCOVERED]{RESET}")
                     print()
-                print(f"{DIM}Tip: Run 'python main.py hunt \"hn:{jobs[0].company}\"' to run an autonomous reality check & tailored pitch!{RESET}\n")
+
+                sample_comp = jobs[0].company
+                print(f"{DIM}Tip: Run 'python main.py hunt \"{sample_comp}\" --export' to audit, match, and generate cold email!{RESET}\n")
         except Exception as e:
             print(f"{RED}[!] Error fetching live postings: {str(e)}{RESET}")
+
+    elif args.command == "pipeline":
+        pipe = JobPipelineStore()
+        if not args.pipe_action or args.pipe_action == "list":
+            leads = pipe.list_leads(
+                status=getattr(args, "status", None),
+                query=getattr(args, "query", None),
+                max_gpi=getattr(args, "max_gpi", None),
+                limit=getattr(args, "limit", 20)
+            )
+            print(BANNER)
+            print(f"{BOLD}Active Opportunities Pipeline ({len(leads)} leads):{RESET}\n")
+            if not leads:
+                print(f"{YELLOW}[!] No opportunities currently match your filter.{RESET}")
+                print(f"{DIM}Tip: Run 'python main.py live --save' to automatically populate your pipeline!{RESET}\n")
+            else:
+                print(f"{BOLD}{'ID':<4} {'COMPANY':<22} {'ROLE':<28} {'STATUS':<14} {'GPI':<8} {'FIT':<6} {'COMPENSATION'}{RESET}")
+                print("-" * 95)
+                for ld in leads:
+                    st_color = GREEN if ld.status == "PITCH_READY" else CYAN if ld.status == "AUDITED" else YELLOW if ld.status == "DISCOVERED" else MAGENTA
+                    gpi_color = GREEN if ld.gpi_score < 40 else YELLOW if ld.gpi_score < 65 else RED
+                    print(f"{ld.id:<4} {ld.company[:20]:<22} {ld.title[:26]:<28} {st_color}{ld.status:<14}{RESET} {gpi_color}{ld.gpi_score:>4.1f}%{RESET}   {ld.fit_score:>4.1f}% {WHITE}{ld.salary[:15]}{RESET}")
+                print()
+
+        elif args.pipe_action == "status":
+            ok = pipe.update_status(args.id, args.new_status, notes=args.notes)
+            if ok:
+                print(f"{GREEN}[+]{RESET} Lead #{args.id} status updated to {BOLD}{args.new_status.upper()}{RESET}")
+            else:
+                print(f"{RED}[!] Lead #{args.id} not found in pipeline.{RESET}")
+
+        elif args.pipe_action == "stats":
+            stats = pipe.get_summary_stats()
+            print(BANNER)
+            print(f"{BOLD}Opportunity Funnel & Conversion Stats:{RESET}")
+            print(f"  Total Tracked Leads : {stats['total_leads']}")
+            print(f"  Active Prospects    : {stats['active_prospects']}")
+            print(f"  Applications Sent   : {stats['applied_count']}")
+            print(f"  Interviews Active   : {stats['interviewing_count']}")
+            print(f"  Offers Received     : {stats['offers_count']}\n")
+            print("Status Breakdown:")
+            for st, cnt in stats["by_status"].items():
+                print(f"  • {st:<16}: {cnt}")
+            print()
+
+        elif args.pipe_action == "inspect":
+            ld = pipe.get_lead(args.id)
+            if not ld:
+                print(f"{RED}[!] Lead #{args.id} not found.{RESET}")
+            else:
+                print(BANNER)
+                print(f"{BOLD}Lead Dossier #{ld.id}:{RESET} {WHITE}{ld.title}{RESET} @ {CYAN}{ld.company}{RESET}")
+                print(f"  Source     : {ld.source}")
+                print(f"  URL        : {ld.url or 'N/A'}")
+                print(f"  Salary     : {ld.salary or 'N/A'}")
+                print(f"  Location   : {ld.location}")
+                print(f"  Status     : {BOLD}{ld.status}{RESET}")
+                print(f"  GPI Score  : {ld.gpi_score}% ({ld.risk_level})")
+                print(f"  Fit Score  : {ld.fit_score}%")
+                print(f"  Created At : {ld.created_at}")
+                print(f"  Updated At : {ld.updated_at}")
+                print(f"  Notes      : {ld.notes or 'None'}\n")
 
     elif args.command == "bypass":
         mock_report = DiagnosticReport(

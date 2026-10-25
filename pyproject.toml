@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "ghost-job-hunter"
-version = "2.0.0"
+version = "2.1.0"
 description = "Autonomous Anti-Ghost Job Hunting & Direct Outreach Agent powered by mcp-mesh"
 readme = "README.md"
 requires-python = ">=3.8"

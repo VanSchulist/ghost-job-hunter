@@ -20,7 +20,11 @@ from .generator import (
     generate_comprehensive_report, generate_executive_bypass_from_params
 )
 
-__version__ = "2.0.0"
+from .sources import UnifiedJobSource, HNHiringSource, RemoteOKSource, WeWorkRemotelySource
+from .pipeline import JobPipelineStore, LeadRecord
+from .outreach import OutreachExporter
+
+__version__ = "2.1.0"
 __author__ = "Van Schulist (Existential Cloud)"
 __license__ = "MIT"
 
@@ -44,5 +48,12 @@ __all__ = [
     "generate_targeted_pitch",
     "generate_comprehensive_report",
     "generate_executive_bypass_from_params",
+    "UnifiedJobSource",
+    "HNHiringSource",
+    "RemoteOKSource",
+    "WeWorkRemotelySource",
+    "JobPipelineStore",
+    "LeadRecord",
+    "OutreachExporter",
     "__version__",
 ]
