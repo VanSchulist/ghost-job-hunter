@@ -1,12 +1,15 @@
 """
 Unit tests for JobPipelineStore (SQLite Opportunity Pipeline).
-Verifies schema initialization, lead insertion, conflict handling, status transitions, and metrics.
+Verifies schema initialization, lead insertion, conflict handling, status transitions, metrics, and structured exports (JSON/CSV).
 """
 
-import unittest
-import tempfile
+import csv
+import json
 import os
+import tempfile
+import unittest
 from pathlib import Path
+
 from ghost_hunter.pipeline import JobPipelineStore, LeadRecord
 
 
@@ -88,6 +91,64 @@ class TestJobPipelineStore(unittest.TestCase):
         self.assertEqual(stats["total_leads"], 3)
         self.assertEqual(stats["applied_count"], 1)
         self.assertEqual(stats["active_prospects"], 1)
+
+    def test_export_leads_json(self):
+        self.store.save_lead(company="Cloudflare", title="Systems Engineer", gpi_score=15.0, status="AUDITED")
+        self.store.save_lead(company="Fastly", title="Edge Engineer", gpi_score=22.0, status="DISCOVERED")
+
+        json_output = self.store.export_leads(format="json", limit=10)
+        data = json.loads(json_output)
+        self.assertEqual(len(data), 2)
+        self.assertIn("company", data[0])
+        self.assertIn("gpi_score", data[0])
+        companies = [item["company"] for item in data]
+        self.assertIn("Cloudflare", companies)
+        self.assertIn("Fastly", companies)
+
+    def test_export_leads_csv(self):
+        self.store.save_lead(company="Stripe", title="API Engineer", gpi_score=8.5, status="PITCH_READY")
+        self.store.save_lead(company="Shopify", title="Backend Lead", gpi_score=18.0, status="AUDITED")
+
+        csv_output = self.store.export_leads(format="csv", limit=10)
+        lines = csv_output.strip().splitlines()
+        self.assertGreater(len(lines), 2)  # Header + 2 data rows
+        header = lines[0].split(",")
+        self.assertIn("company", header)
+        self.assertIn("title", header)
+        self.assertIn("gpi_score", header)
+        self.assertIn("Stripe", csv_output)
+        self.assertIn("Shopify", csv_output)
+
+    def test_export_leads_to_file(self):
+        self.store.save_lead(company="GitHub", title="Core Engineer", gpi_score=5.0, status="AUDITED")
+        out_json_path = Path(self.tmp_dir.name) / "exported_leads.json"
+        out_csv_path = Path(self.tmp_dir.name) / "exported_leads.csv"
+
+        self.store.export_leads(format="json", output_path=out_json_path)
+        self.assertTrue(out_json_path.exists())
+        with open(out_json_path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+            self.assertEqual(len(data), 1)
+            self.assertEqual(data[0]["company"], "GitHub")
+
+        self.store.export_leads(format="csv", output_path=out_csv_path)
+        self.assertTrue(out_csv_path.exists())
+        with open(out_csv_path, "r", encoding="utf-8") as f:
+            lines = f.readlines()
+            self.assertEqual(len(lines), 2)  # Header + 1 row
+
+    def test_export_leads_invalid_format(self):
+        with self.assertRaises(ValueError):
+            self.store.export_leads(format="yaml")
+
+    def test_export_empty_pipeline(self):
+        json_res = self.store.export_leads(format="json")
+        self.assertEqual(json_res, "[]")
+
+        csv_res = self.store.export_leads(format="csv")
+        lines = csv_res.strip().splitlines()
+        self.assertEqual(len(lines), 1)
+        self.assertIn("company", lines[0])
 
 
 if __name__ == "__main__":

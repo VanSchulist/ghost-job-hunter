@@ -6,13 +6,16 @@ Zero external dependencies (uses standard library sqlite3, json, datetime, conte
 
 from __future__ import annotations
 
-import os
-import sqlite3
-import datetime
 import contextlib
+import csv
+import datetime
+import io
+import json
+import os
 from pathlib import Path
-from dataclasses import dataclass, asdict
-from typing import List, Dict, Optional, Any, Iterator
+import sqlite3
+from dataclasses import asdict, dataclass
+from typing import Any, Dict, Iterator, List, Optional
 
 
 @dataclass
@@ -238,3 +241,58 @@ class JobPipelineStore:
                 "interviewing_count": interviewing,
                 "offers_count": offers,
             }
+
+    def export_leads(
+        self,
+        format: str = "json",
+        status: Optional[str] = None,
+        query: Optional[str] = None,
+        max_gpi: Optional[float] = None,
+        limit: int = 50,
+        output_path: Optional[str | Path] = None,
+    ) -> str:
+        """Exports tracked pipeline opportunities to structured JSON or CSV format.
+
+        Optionally writes output to file when output_path is provided.
+        Returns the formatted string.
+        """
+        fmt = format.strip().lower()
+        if fmt not in ("json", "csv"):
+            raise ValueError(f"Unsupported export format: {format!r}. Must be 'json' or 'csv'.")
+
+        leads = self.list_leads(status=status, query=query, max_gpi=max_gpi, limit=limit)
+        lead_dicts = [asdict(ld) for ld in leads]
+
+        if fmt == "json":
+            result_str = json.dumps(lead_dicts, indent=2, ensure_ascii=False)
+        else:
+            buffer = io.StringIO()
+            fields = [
+                "id",
+                "company",
+                "title",
+                "source",
+                "url",
+                "salary",
+                "location",
+                "gpi_score",
+                "risk_level",
+                "fit_score",
+                "status",
+                "notes",
+                "created_at",
+                "updated_at",
+            ]
+            writer = csv.DictWriter(buffer, fieldnames=fields, lineterminator="\n")
+            writer.writeheader()
+            for row in lead_dicts:
+                writer.writerow(row)
+            result_str = buffer.getvalue()
+
+        if output_path:
+            out_file = Path(output_path)
+            out_file.parent.mkdir(parents=True, exist_ok=True)
+            with open(out_file, "w", encoding="utf-8", newline="") as f:
+                f.write(result_str)
+
+        return result_str

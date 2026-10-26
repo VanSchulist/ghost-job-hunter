@@ -291,6 +291,16 @@ def main():
     p_pl_list.add_argument("--query", default=None, help="Filter by company or role keyword")
     p_pl_list.add_argument("--max-gpi", type=float, default=None, help="Maximum Ghost Probability Index (GPI)")
     p_pl_list.add_argument("--limit", type=int, default=20, help="Max entries to return")
+    p_pl_list.add_argument("--format", choices=["table", "json", "csv"], default="table", help="Output format: table, json, csv (default: table)")
+    p_pl_list.add_argument("--output", "-o", default=None, help="Write output directly to file path")
+
+    p_pl_export = p_pipe_sub.add_parser("export", help="Export pipeline audit leads to structured JSON or CSV")
+    p_pl_export.add_argument("--format", choices=["json", "csv"], default="json", help="Export format: json, csv (default: json)")
+    p_pl_export.add_argument("--status", choices=JobPipelineStore.VALID_STATUSES, default=None, help="Filter by pipeline status")
+    p_pl_export.add_argument("--query", default=None, help="Filter by company or role keyword")
+    p_pl_export.add_argument("--max-gpi", type=float, default=None, help="Maximum Ghost Probability Index (GPI)")
+    p_pl_export.add_argument("--limit", type=int, default=100, help="Max entries to export (default: 100)")
+    p_pl_export.add_argument("--output", "-o", default=None, help="Write output directly to file path")
 
     p_pl_status = p_pipe_sub.add_parser("status", help="Update the status of a lead")
     p_pl_status.add_argument("id", type=int, help="Lead ID in pipeline")
@@ -550,26 +560,57 @@ def main():
 
     elif args.command == "pipeline":
         pipe = JobPipelineStore()
-        if not args.pipe_action or args.pipe_action == "list":
-            leads = pipe.list_leads(
-                status=getattr(args, "status", None),
-                query=getattr(args, "query", None),
-                max_gpi=getattr(args, "max_gpi", None),
-                limit=getattr(args, "limit", 20)
-            )
-            print(BANNER)
-            print(f"{BOLD}Active Opportunities Pipeline ({len(leads)} leads):{RESET}\n")
-            if not leads:
-                print(f"{YELLOW}[!] No opportunities currently match your filter.{RESET}")
-                print(f"{DIM}Tip: Run 'python main.py live --save' to automatically populate your pipeline!{RESET}\n")
+        if not args.pipe_action or args.pipe_action in ("list", "export"):
+            fmt = getattr(args, "format", "table" if args.pipe_action != "export" else "json").lower()
+            out_path = getattr(args, "output", None)
+            limit_val = getattr(args, "limit", 20 if args.pipe_action != "export" else 100)
+
+            if fmt in ("json", "csv"):
+                content = pipe.export_leads(
+                    format=fmt,
+                    status=getattr(args, "status", None),
+                    query=getattr(args, "query", None),
+                    max_gpi=getattr(args, "max_gpi", None),
+                    limit=limit_val,
+                    output_path=out_path
+                )
+                if out_path:
+                    print(f"{GREEN}[+]{RESET} Successfully exported pipeline leads to {BOLD}{out_path}{RESET} ({fmt.upper()} format).")
+                else:
+                    sys.stdout.write(content + "\n")
             else:
-                print(f"{BOLD}{'ID':<4} {'COMPANY':<22} {'ROLE':<28} {'STATUS':<14} {'GPI':<8} {'FIT':<6} {'COMPENSATION'}{RESET}")
-                print("-" * 95)
-                for ld in leads:
-                    st_color = GREEN if ld.status == "PITCH_READY" else CYAN if ld.status == "AUDITED" else YELLOW if ld.status == "DISCOVERED" else MAGENTA
-                    gpi_color = GREEN if ld.gpi_score < 40 else YELLOW if ld.gpi_score < 65 else RED
-                    print(f"{ld.id:<4} {ld.company[:20]:<22} {ld.title[:26]:<28} {st_color}{ld.status:<14}{RESET} {gpi_color}{ld.gpi_score:>4.1f}%{RESET}   {ld.fit_score:>4.1f}% {WHITE}{ld.salary[:15]}{RESET}")
-                print()
+                leads = pipe.list_leads(
+                    status=getattr(args, "status", None),
+                    query=getattr(args, "query", None),
+                    max_gpi=getattr(args, "max_gpi", None),
+                    limit=limit_val
+                )
+                table_lines = [
+                    BANNER,
+                    f"{BOLD}Active Opportunities Pipeline ({len(leads)} leads):{RESET}\n"
+                ]
+                if not leads:
+                    table_lines.append(f"{YELLOW}[!] No opportunities currently match your filter.{RESET}")
+                    table_lines.append(f"{DIM}Tip: Run 'python main.py live --save' to automatically populate your pipeline!{RESET}\n")
+                else:
+                    table_lines.append(f"{BOLD}{'ID':<4} {'COMPANY':<22} {'ROLE':<28} {'STATUS':<14} {'GPI':<8} {'FIT':<6} {'COMPENSATION'}{RESET}")
+                    table_lines.append("-" * 95)
+                    for ld in leads:
+                        st_color = GREEN if ld.status == "PITCH_READY" else CYAN if ld.status == "AUDITED" else YELLOW if ld.status == "DISCOVERED" else MAGENTA
+                        gpi_color = GREEN if ld.gpi_score < 40 else YELLOW if ld.gpi_score < 65 else RED
+                        table_lines.append(f"{ld.id:<4} {ld.company[:20]:<22} {ld.title[:26]:<28} {st_color}{ld.status:<14}{RESET} {gpi_color}{ld.gpi_score:>4.1f}%{RESET}   {ld.fit_score:>4.1f}% {WHITE}{ld.salary[:15]}{RESET}")
+                    table_lines.append("")
+
+                table_output = "\n".join(table_lines)
+                if out_path:
+                    # Strip ANSI codes for plain text file output
+                    import re
+                    plain_output = re.sub(r'\x1b\[[0-9;]*m', '', table_output)
+                    with open(out_path, "w", encoding="utf-8") as f_out:
+                        f_out.write(plain_output)
+                    print(f"{GREEN}[+]{RESET} Successfully saved pipeline table to {BOLD}{out_path}{RESET}.")
+                else:
+                    print(table_output)
 
         elif args.pipe_action == "status":
             ok = pipe.update_status(args.id, args.new_status, notes=args.notes)

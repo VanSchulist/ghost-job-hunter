@@ -109,8 +109,10 @@ ghost-job-hunter hunt "path/to/job_posting.txt" --company "Stripe" --title "Staf
 # 3. Scrape live remote developer positions and save to local pipeline
 ghost-job-hunter live --source hn --remote --limit 10 --save
 
-# 4. Query local pipeline opportunities
+# 4. Query and export local pipeline opportunities (Table, JSON, CSV)
 ghost-job-hunter pipeline list --status AUDITED --max-gpi 40.0
+ghost-job-hunter pipeline list --format json
+ghost-job-hunter pipeline export --format csv --output leads.csv
 
 # 5. Inspect corporate GitHub engineering reality
 ghost-job-hunter inspect "CompanySlug" --claimed rust kubernetes python
@@ -127,7 +129,7 @@ ghost-job-hunter serve-mcp
 python -m unittest discover -s tests -v
 ```
 
-All 33 test cases execute in ~9 seconds using Python's standard library test runner.
+All 38 test cases execute in ~9 seconds using Python's standard library test runner.
 
 ---
 
