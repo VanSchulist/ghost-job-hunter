@@ -53,7 +53,7 @@ TOOLS_MANIFEST = [
         "inputSchema": {
             "type": "object",
             "properties": {
-                "target": {"type": "string", "description": "Job description text, file path, URL, or sample ('ghost', 'legit', 'compliance')"},
+                "target": {"type": "string", "description": "Job description text, file path, URL, sample ('ghost', 'legit', 'compliance'), or ATS target ('greenhouse:stripe', 'lever:figma', 'hn:company')"},
                 "title": {"type": "string", "description": "Job title"},
                 "company": {"type": "string", "description": "Company name"}
             },

@@ -49,7 +49,7 @@ BANNER = rf"""{CYAN}{BOLD}
  | |  _| |_| | | | \___ \ | |   _  | | | | |  _ \ 
  | |_| |  _  | |_| |___) || |  | |_| | |_| | |_) |
   \____|_| |_|\___/|____/ |_|   \___/ \___/|____/ 
-  {MAGENTA}>> GHOST JOB HUNTER v2.1 | Deterministic Heuristic Engine <<{RESET}
+  {MAGENTA}>> GHOST JOB HUNTER v2.2 | Deterministic Heuristic Engine <<{RESET}
   {DIM}Engineered by Van Schulist (@VanSchulist) | Existential Cloud{RESET}
 """
 
@@ -218,10 +218,10 @@ def cmd_demo(args: argparse.Namespace) -> None:
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Ghost Job Hunter v2.1 - Deterministic heuristic job audit engine powered by mcp-mesh."
+        description="Ghost Job Hunter v2.2 - Deterministic heuristic job audit engine powered by mcp-mesh."
     )
     parser.add_argument("--demo", "-d", action="store_true", help="Run instant zero-config heuristic audit demonstration")
-    parser.add_argument("--version", "-v", action="version", version="ghost-job-hunter 2.1.0")
+    parser.add_argument("--version", "-v", action="version", version="ghost-job-hunter 2.2.0")
     subparsers = parser.add_subparsers(dest="command", help="Available subcommands")
 
     # Command: demo
@@ -229,7 +229,7 @@ def main():
 
     # Command: hunt (Autonomous Agent Pipeline)
     p_hunt = subparsers.add_parser("hunt", help="Autonomous end-to-end job hunting workflow via mcp-mesh")
-    p_hunt.add_argument("target", help="Job description text, file path, URL, sample ('ghost', 'legit', 'compliance'), or live query ('hn:co', 'remoteok:co', 'wwr:co')")
+    p_hunt.add_argument("target", help="Job description text, file path, URL, sample ('ghost', 'legit', 'compliance'), or live query ('greenhouse:co', 'lever:co', 'hn:co', 'remoteok:co', 'wwr:co')")
     p_hunt.add_argument("--title", default=None, help="Target Job Title")
     p_hunt.add_argument("--company", default=None, help="Target Company Name")
     p_hunt.add_argument("--profile", default=None, help="Path to custom candidate profile JSON")
@@ -275,8 +275,9 @@ def main():
     p_samples.add_argument("sample_type", choices=["ghost", "legit", "compliance"], help="Sample type to evaluate")
 
     # Command: live (Multi-Source Real-World Feeds)
-    p_live = subparsers.add_parser("live", help="Browse real, live developer job postings across HN, RemoteOK, and WeWorkRemotely")
-    p_live.add_argument("--source", choices=["all", "hn", "remoteok", "wwr"], default="all", help="Job source (default: all)")
+    p_live = subparsers.add_parser("live", help="Browse real, live developer job postings across Greenhouse, Lever, HN, RemoteOK, and WeWorkRemotely")
+    p_live.add_argument("--source", choices=["all", "hn", "remoteok", "wwr", "greenhouse", "lever"], default="all", help="Job source (default: all)")
+    p_live.add_argument("--company", default=None, help="Company board token for Greenhouse or Lever (e.g. 'stripe', 'figma')")
     p_live.add_argument("--query", default=None, help="Search filter (e.g. 'python', 'rust', 'backend')")
     p_live.add_argument("--remote", action="store_true", help="Filter only remote-friendly postings")
     p_live.add_argument("--limit", type=int, default=5, help="Number of postings to display (default: 5)")
@@ -524,7 +525,13 @@ def main():
         pipe = JobPipelineStore() if args.save else None
 
         try:
-            jobs = unified.fetch_live_jobs(source=args.source, query=args.query, remote_only=args.remote, limit=args.limit)
+            jobs = unified.fetch_live_jobs(
+                source=args.source,
+                query=args.query,
+                remote_only=args.remote,
+                company=getattr(args, "company", None),
+                limit=args.limit
+            )
             if not jobs:
                 print(f"{YELLOW}[!] No matching live job postings found.{RESET}")
             else:

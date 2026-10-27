@@ -69,9 +69,9 @@ class JobHunterAgent:
                 description=COMPLIANCE_SAMPLE
             )
 
-        # 2. Check if target is a live query, e.g. "hn:neuralframe", "remoteok:onebrief", "wwr:duckduckgo"
-        prefixes = ("hn:", "remoteok:", "wwr:", "live:", "online:")
-        if lower_t.startswith(prefixes) or lower_t in ["hn", "remoteok", "wwr", "live"]:
+        # 2. Check if target is a live query, e.g. "hn:neuralframe", "greenhouse:stripe", "lever:figma", "remoteok:onebrief"
+        prefixes = ("hn:", "remoteok:", "wwr:", "live:", "online:", "greenhouse:", "lever:")
+        if lower_t.startswith(prefixes) or lower_t in ["hn", "remoteok", "wwr", "live", "greenhouse", "lever"]:
             from .sources import UnifiedJobSource
             source = UnifiedJobSource()
             job = source.resolve_target(target)
@@ -82,8 +82,19 @@ class JobHunterAgent:
                     job.company = company
                 return job
 
-        # 2. Check if target is a URL
+        # 3. Check if target is a URL
         if target.startswith("http://") or target.startswith("https://"):
+            # Check for direct Greenhouse or Lever URLs first
+            if "boards.greenhouse.io" in target or "jobs.lever.co" in target:
+                from .sources import UnifiedJobSource
+                source = UnifiedJobSource()
+                job = source.resolve_target(target)
+                if job:
+                    if title:
+                        job.title = title
+                    if company:
+                        job.company = company
+                    return job
             try:
                 req = urllib.request.Request(
                     target,

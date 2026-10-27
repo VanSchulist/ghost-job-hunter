@@ -273,6 +273,197 @@ class WeWorkRemotelySource:
         return jobs
 
 
+class GreenhouseSource:
+    """
+    Direct public API consumer for companies hosting job boards on Greenhouse.
+    Queries https://boards-api.greenhouse.io/v1/boards/{company}/jobs?content=true
+    Zero external dependencies, 100% standard library (urllib.request, json, re).
+    """
+
+    def __init__(self):
+        self.headers = {"User-Agent": "GhostJobHunter/2.2 (+https://github.com/VanSchulist/ghost-job-hunter)"}
+
+    def fetch_jobs(
+        self,
+        company: str,
+        query: Optional[str] = None,
+        limit: int = 10,
+        content: bool = True,
+    ) -> List[JobPosting]:
+        """
+        Fetches live postings directly from a company's Greenhouse job board.
+        `company`: the Greenhouse board token (e.g. 'stripe', 'canonical', 'github', 'airbnb')
+        """
+        company_slug = re.sub(r"[^a-zA-Z0-9_\-]", "", company.strip().lower())
+        if not company_slug:
+            return []
+
+        url = f"https://boards-api.greenhouse.io/v1/boards/{company_slug}/jobs?content={'true' if content else 'false'}"
+        req = urllib.request.Request(url, headers=self.headers)
+
+        try:
+            with urllib.request.urlopen(req, timeout=12) as res:
+                if res.status != 200:
+                    return []
+                data = json.loads(res.read().decode("utf-8"))
+        except Exception:
+            return []
+
+        jobs_list = data.get("jobs", [])
+        if not isinstance(jobs_list, list):
+            return []
+
+        results: List[JobPosting] = []
+
+        for item in jobs_list:
+            if not isinstance(item, dict):
+                continue
+
+            title = item.get("title", "").strip()
+            raw_content = item.get("content", "")
+            clean_desc = _clean_html(raw_content) if raw_content else title
+
+            # Keyword filtering if specified
+            if query:
+                q_lower = query.lower().strip()
+                if q_lower not in title.lower() and q_lower not in clean_desc.lower():
+                    continue
+
+            # Extract location
+            loc_info = item.get("location", {})
+            location = loc_info.get("name", "Remote / Unspecified") if isinstance(loc_info, dict) else str(loc_info)
+
+            # Extract departments / metadata
+            dept_names = [d.get("name") for d in item.get("departments", []) if isinstance(d, dict) and d.get("name")]
+            if dept_names:
+                clean_desc = f"[Department: {', '.join(dept_names)}] {clean_desc}"
+
+            # Salary extraction
+            salary_match = re.search(r"\$\d{2,3}[kK0-9,\s–—\-\$to]+", clean_desc)
+            salary_raw = salary_match.group(0) if salary_match else ""
+
+            updated_at = item.get("updated_at", "")
+            url_link = item.get("absolute_url", f"https://boards.greenhouse.io/{company_slug}/jobs/{item.get('id', '')}")
+
+            posting = JobPosting(
+                title=title,
+                company=company_slug.capitalize(),
+                description=clean_desc,
+                location=location,
+                salary_raw=salary_raw,
+                url=url_link,
+                posted_date=updated_at,
+                requirements=[],
+            )
+            results.append(posting)
+            if len(results) >= limit:
+                break
+
+        return results
+
+
+class LeverSource:
+    """
+    Direct public API consumer for companies hosting job boards on Lever.co.
+    Queries https://api.lever.co/v0/postings/{company}?mode=json
+    Zero external dependencies, 100% standard library (urllib.request, json, re, datetime).
+    """
+
+    def __init__(self):
+        self.headers = {"User-Agent": "GhostJobHunter/2.2 (+https://github.com/VanSchulist/ghost-job-hunter)"}
+
+    def fetch_jobs(
+        self,
+        company: str,
+        query: Optional[str] = None,
+        limit: int = 10,
+    ) -> List[JobPosting]:
+        """
+        Fetches live postings directly from a company's Lever job board.
+        `company`: the Lever board token (e.g. 'figma', 'netflix', 'palantir')
+        """
+        company_slug = re.sub(r"[^a-zA-Z0-9_\-]", "", company.strip().lower())
+        if not company_slug:
+            return []
+
+        url = f"https://api.lever.co/v0/postings/{company_slug}?mode=json"
+        req = urllib.request.Request(url, headers=self.headers)
+
+        try:
+            with urllib.request.urlopen(req, timeout=12) as res:
+                if res.status != 200:
+                    return []
+                data = json.loads(res.read().decode("utf-8"))
+        except Exception:
+            return []
+
+        if not isinstance(data, list):
+            return []
+
+        results: List[JobPosting] = []
+
+        for item in data:
+            if not isinstance(item, dict):
+                continue
+
+            title = item.get("text", "").strip()
+            plain_desc = item.get("descriptionPlain", "")
+            raw_desc = item.get("description", "")
+            clean_desc = plain_desc if plain_desc else _clean_html(raw_desc)
+            if not clean_desc:
+                clean_desc = title
+
+            # Keyword filtering
+            if query:
+                q_lower = query.lower().strip()
+                if q_lower not in title.lower() and q_lower not in clean_desc.lower():
+                    continue
+
+            # Categories (team, department, location)
+            categories = item.get("categories", {})
+            location = "Remote / Unspecified"
+            if isinstance(categories, dict):
+                location = categories.get("location") or categories.get("workplaceType") or location
+                team = categories.get("team")
+                department = categories.get("department")
+                dept_str = " / ".join(filter(None, [department, team]))
+                if dept_str:
+                    clean_desc = f"[{dept_str}] {clean_desc}"
+
+            # Salary extraction
+            salary_match = re.search(r"\$\d{2,3}[kK0-9,\s–—\-\$to]+", clean_desc)
+            salary_raw = salary_match.group(0) if salary_match else ""
+
+            # Posted date from epoch milliseconds
+            created_at_ms = item.get("createdAt")
+            posted_date = ""
+            if isinstance(created_at_ms, (int, float)) and created_at_ms > 0:
+                import datetime
+                try:
+                    dt = datetime.datetime.fromtimestamp(created_at_ms / 1000.0, tz=datetime.timezone.utc)
+                    posted_date = dt.strftime("%Y-%m-%dT%H:%M:%SZ")
+                except Exception:
+                    pass
+
+            hosted_url = item.get("hostedUrl", f"https://jobs.lever.co/{company_slug}/{item.get('id', '')}")
+
+            posting = JobPosting(
+                title=title,
+                company=company_slug.capitalize(),
+                description=clean_desc,
+                location=str(location),
+                salary_raw=salary_raw,
+                url=hosted_url,
+                posted_date=posted_date,
+                requirements=[],
+            )
+            results.append(posting)
+            if len(results) >= limit:
+                break
+
+        return results
+
+
 class UnifiedJobSource:
     """
     Unified aggregator routing across all live developer hiring feeds.
@@ -283,20 +474,31 @@ class UnifiedJobSource:
         self.hn = HNHiringSource()
         self.remoteok = RemoteOKSource()
         self.wwr = WeWorkRemotelySource()
+        self.greenhouse = GreenhouseSource()
+        self.lever = LeverSource()
 
     def fetch_live_jobs(
         self,
         source: str = "all",
         query: Optional[str] = None,
         remote_only: bool = False,
+        company: Optional[str] = None,
         limit: int = 10
     ) -> List[JobPosting]:
         """
         Fetches live developer postings across selected real-world feeds.
-        `source`: 'all' | 'hn' | 'remoteok' | 'wwr'
+        `source`: 'all' | 'hn' | 'remoteok' | 'wwr' | 'greenhouse' | 'lever'
         """
         source = source.lower().strip()
         jobs: List[JobPosting] = []
+
+        if source in ["greenhouse"]:
+            comp_target = company or query or "stripe"
+            return self.greenhouse.fetch_jobs(company=comp_target, query=query if company else None, limit=limit)
+
+        if source in ["lever"]:
+            comp_target = company or query or "figma"
+            return self.lever.fetch_jobs(company=comp_target, query=query if company else None, limit=limit)
 
         if source in ["hn", "all"]:
             try:
@@ -336,12 +538,42 @@ class UnifiedJobSource:
         """
         Resolves a company or role query into a live JobPosting.
         Supports prefixes:
+          - 'greenhouse:<Company>' (or 'greenhouse:<Company>:<Role>')
+          - 'lever:<Company>' (or 'lever:<Company>:<Role>')
           - 'hn:<Company>'
           - 'remoteok:<Company>'
           - 'wwr:<Company>'
+          - Direct Greenhouse or Lever board URLs
           - '<Company>' (searches across all)
         """
         target = target.strip()
+
+        # Check for direct Greenhouse job board URLs
+        if "boards.greenhouse.io" in target:
+            match = re.search(r"boards\.greenhouse\.io/([^/]+)(?:/jobs/(\d+))?", target)
+            if match:
+                comp_slug = match.group(1)
+                job_id = match.group(2)
+                results = self.greenhouse.fetch_jobs(company=comp_slug, limit=30)
+                if job_id:
+                    for r in results:
+                        if f"/jobs/{job_id}" in r.url:
+                            return r
+                return results[0] if results else None
+
+        # Check for direct Lever job board URLs
+        if "jobs.lever.co" in target:
+            match = re.search(r"jobs\.lever\.co/([^/]+)(?:/([a-zA-Z0-9\-]+))?", target)
+            if match:
+                comp_slug = match.group(1)
+                job_id = match.group(2)
+                results = self.lever.fetch_jobs(company=comp_slug, limit=30)
+                if job_id:
+                    for r in results:
+                        if f"/{job_id}" in r.url:
+                            return r
+                return results[0] if results else None
+
         prefix = ""
         comp_query = target
 
@@ -350,7 +582,19 @@ class UnifiedJobSource:
             prefix = prefix.lower().strip()
             comp_query = comp_query.strip()
 
-        if prefix == "hn":
+        if prefix == "greenhouse":
+            parts = comp_query.split(":", 1)
+            comp_name = parts[0].strip()
+            role_filter = parts[1].strip() if len(parts) > 1 else None
+            results = self.greenhouse.fetch_jobs(company=comp_name, query=role_filter, limit=3)
+            return results[0] if results else None
+        elif prefix == "lever":
+            parts = comp_query.split(":", 1)
+            comp_name = parts[0].strip()
+            role_filter = parts[1].strip() if len(parts) > 1 else None
+            results = self.lever.fetch_jobs(company=comp_name, query=role_filter, limit=3)
+            return results[0] if results else None
+        elif prefix == "hn":
             results = self.hn.fetch_live_jobs(query=comp_query, limit=3)
             return results[0] if results else None
         elif prefix == "remoteok":

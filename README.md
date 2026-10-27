@@ -89,7 +89,7 @@ Where $w_i$ represents the empirically calibrated signal weight and $s_i \in [0,
 ## ⚙️ Core Technical Capabilities
 
 * **100% Zero External Dependencies**: Engineered strictly with Python 3.8+ standard library (`urllib.request`, `json`, `sqlite3`, `email`, `re`, `argparse`). Instant, frictionless deployment.
-* **Live Developer Hiring Feeds (`live`)**: Scrapes active engineering postings directly from Hacker News (*"Ask HN: Who is hiring?"*), RemoteOK, and WeWorkRemotely without third-party web scrapers.
+* **Native Enterprise ATS & Community Feeds (`live`)**: Directly queries public JSON APIs for Greenhouse (`boards-api.greenhouse.io`) and Lever (`api.lever.co`), alongside Hacker News (*"Ask HN: Who is hiring?"*), RemoteOK, and WeWorkRemotely without fragile HTML scrapers.
 * **Local SQLite Pipeline Ledger (`pipeline`)**: Automatically persists tracked opportunities to `~/.ghost-hunter/pipeline.db` using SQLite with WAL mode. Tracks lifecycle states: `DISCOVERED` ➔ `AUDITED` ➔ `PITCH_READY` ➔ `APPLIED` ➔ `INTERVIEWING` ➔ `OFFER` ➔ `REJECTED`.
 * **RFC 822 Email Package Exporter (`--export`)**: Compiles tailored outreach into standard `.eml` MIME files compatible with Apple Mail, Thunderbird, and Microsoft Outlook, paired with markdown dossiers and direct `mailto:` links.
 * **Corporate GitHub Footprint Auditing (`inspect`)**: Cross-references job requisition tech claims against target company public GitHub organizations to verify actual commit recency and language distribution.
@@ -106,18 +106,24 @@ ghost-job-hunter --demo
 # 2. Autonomous end-to-end audit and pipeline ingestion
 ghost-job-hunter hunt "path/to/job_posting.txt" --company "Stripe" --title "Staff Infrastructure Engineer" --export
 
-# 3. Scrape live remote developer positions and save to local pipeline
+# 3. Audit directly from Greenhouse or Lever public ATS APIs
+ghost-job-hunter hunt "greenhouse:stripe" --export
+ghost-job-hunter hunt "lever:figma" --export
+
+# 4. Ingest live developer positions across ATS and community sources
+ghost-job-hunter live --source greenhouse --company stripe --limit 10
+ghost-job-hunter live --source lever --company figma --limit 10
 ghost-job-hunter live --source hn --remote --limit 10 --save
 
-# 4. Query and export local pipeline opportunities (Table, JSON, CSV)
+# 5. Query and export local pipeline opportunities (Table, JSON, CSV)
 ghost-job-hunter pipeline list --status AUDITED --max-gpi 40.0
 ghost-job-hunter pipeline list --format json
 ghost-job-hunter pipeline export --format csv --output leads.csv
 
-# 5. Inspect corporate GitHub engineering reality
+# 6. Inspect corporate GitHub engineering reality
 ghost-job-hunter inspect "CompanySlug" --claimed rust kubernetes python
 
-# 6. Run as an MCP stdio server
+# 7. Run as an MCP stdio server
 ghost-job-hunter serve-mcp
 ```
 
@@ -129,7 +135,7 @@ ghost-job-hunter serve-mcp
 python -m unittest discover -s tests -v
 ```
 
-All 38 test cases execute in ~9 seconds using Python's standard library test runner.
+All 42 test cases execute in ~9 seconds using Python's standard library test runner.
 
 ---
 
